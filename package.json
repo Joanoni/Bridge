@@ -1,0 +1,58 @@
+{
+  "name": "bridge-vscode",
+  "displayName": "Bridge",
+  "description": "Orquestração de scripts e UI customizada ancorada no VS Code",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bridge-explorer",
+          "title": "Bridge",
+          "icon": "$(plug)"
+        }
+      ]
+    },
+    "views": {
+      "bridge-explorer": [
+        {
+          "type": "webview",
+          "id": "bridgeView",
+          "name": "Bridge Dashboard"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "bridge.runPipeline",
+        "title": "Bridge: Executar Pipeline",
+        "category": "Bridge"
+      },
+      {
+        "command": "bridge.openView",
+        "title": "Bridge: Abrir Painel Lateral",
+        "category": "Bridge"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "bridge.openView",
+        "key": "ctrl+alt+.",
+        "mac": "cmd+alt+.",
+        "when": "!terminalFocus"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "eslint": "^8.41.0"
+  }
+}
