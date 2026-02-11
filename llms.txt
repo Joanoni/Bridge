@@ -1,0 +1,65 @@
+# Bridge: Technical Context & Architecture for LLMs
+
+> **System Role**: Bridge is a VS Code extension that acts as a local orchestration runtime, enabling users to build reactive tools using JavaScript and HTML without developing full extensions.
+
+# Vision & Core Philosophy
+
+Bridge operates on the **Conceptual Recoil** methodology: strictly prioritize native structures (Webviews, standard Node.js processes) over complex abstractions.
+- **Goal**: Zero-boilerplate extensibility.
+- **Principle**: If a feature requires a heavy build step or complex state management within the extension core, recoil and simplify. Delegate complexity to the user's script space.
+- **Identity**: Bridge is the "Host"; the User's `.bridge/` folder is the "Application".
+
+# Architecture & Lifecycle
+
+The system uses a **Host-Client** model running entirely on the local machine.
+
+## 1. The Host (VS Code Extension Process)
+- **Entry Point**: `extension.js`
+- **Runtime**: VS Code Extension Host.
+- **Responsibilities**:
+  - Manages `WebviewView` (Side Bar UI) and `WebviewPanel`.
+  - **Hydration Strategy**: Enforces a strict **150ms delay** after setting HTML content before sending the initial `HYDRATE` message. This ensures the Webview's `window.addEventListener` is ready to receive data.
+  - Event Listener: Watches `onDidSaveTextDocument` and executes commands.
+  - Process Manager: Spawns and kills `child_process` instances.
+
+## 2. The Orchestrator (Pipeline Process)
+- **Entry Point**: `internal/bootstrapper.js`
+- **Runtime**: `child_process.fork()` using `process.execPath` (VS Code's internal Node.js binary).
+- **Isolation**: Each Pipeline trigger spawns a **new** OS process.
+- **Responsibilities**:
+  - Injects the `global.bridge` SDK.
+  - Executes the user's Pipeline logic.
+  - Manages atomic script execution via `vm.Context`.
+  - **State Persistence**: Maintains a `bridge.state` object that persists in memory for the entire duration of the Pipeline process. This object is passed by reference to every atomic script, enabling data sharing (e.g., caching file reads) between steps.
+
+## 3. The Worker (Atomic Script Runtime)
+- **Runtime**: Node.js `vm` module within the Orchestrator process.
+- **Wrapper**: Code is wrapped in an Async IIFE `(async () => { ... })()` to allow top-level `return` and `await`.
+- **Safety**: Prevents global scope pollution between scripts in the same pipeline.
+
+# The .bridge/ Workspace Contract
+
+Bridge is an engine that discovers and consumes the `.bridge/` directory in the user's workspace root.
+
+- **`/.bridge/pipelines/*.js`** (Controllers)
+  - **Role**: Entry points for automation.
+  - **Execution**: `fork`ed as a separate process.
+  - **Contract**: Must export `config` (triggers) and `run()` (logic).
+- **`/.bridge/scripts/*.js`** (Workers)
+  - **Role**: Reusable, pure logic units.
+  - **Execution**: Run via `bridge.execute()` inside a `vm`.
+  - **Context**: Access to `bridge.input` (payload) and `bridge.state` (shared memory).
+- **`/.bridge/ui/*.html`** (Views)
+  - **Role**: Static UI components.
+  - **Rendering**: Served via Webview with local resource URI resolution.
+  - **Hydration**: Reacts to `window.postMessage` events (`HYDRATE`, `UI_EVENT`).
+
+# Technical Golden Rules
+
+1.  **The SDK is Injected**: Never `require('bridge')`. The `global.bridge` object is injected by `bootstrapper.js` at runtime.
+2.  **No Native NPM**: The extension core does NOT contain `npm`. Users must manage dependencies in `.bridge/` if their scripts require external modules.
+3.  **IPC Bridge**: UI interactions travel: `Webview -> Extension Host -> Pipeline Process`. Do not attempt direct communication between UI and Script.
+4.  **Process ExecPath**: Always use `process.execPath` for forking to ensure the runtime matches VS Code's internal Node.js version, avoiding dependency on the system's Node installation.
+5.  **Strict Trigger Regex**: File watchers scan for `/trigger:\s*['"]...['"]/` in pipeline files to avoid parsing ASTs on every save.
+6.  **Persistence Protocol**: `bridge.state` is the single source of truth for pipeline lifecycle data. It is not cleared between `bridge.execute()` calls within the same process.
+7.  **Async Hydration**: The Host must wait 150ms before sending the payload to the UI to avoid race conditions where the DOM is ready but the JS listener is not.

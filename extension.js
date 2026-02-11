@@ -28,7 +28,14 @@ class BridgeViewProvider {
             ]
         };
 
-        // Escutar mensagens vindas da Webview -> Enviar para o Pipeline
+        /**
+         * ARCHITECTURAL DECISION [Secure Message Broker]:
+         * The Extension Host acts as the "Man-in-the-Middle" between the UI (Webview) and the Logic (Pipeline).
+         * * RATIONALE:
+         * 1. **Security Sandbox**: Webviews run in an isolated iframe context and cannot access the Node.js process directly.
+         * 2. **State Management**: The Host is the only entity aware of both the UI state and the active process state.
+         * 3. **Protocol Enforcement**: Allows us to validate or transform messages before they reach the user script.
+         */
         webviewView.webview.onDidReceiveMessage(data => {
             if (this._activeProcess) {
                 this._activeProcess.send({ type: 'UI_EVENT', data });
@@ -102,6 +109,14 @@ class BridgeViewProvider {
 function runPipelineFile(pipelinePath, workspaceRoot, context, provider, eventData = null) {
     const bootstrapperPath = path.join(context.extensionPath, 'internal', 'bootstrapper.js');
 
+    /**
+     * ARCHITECTURAL DECISION [Runtime Isolation & Dependency Freedom]:
+     * We intentionally use `process.execPath` (VS Code's internal Node binary) instead of relying on the system's `node`.
+     * * RATIONALE:
+     * 1. **Zero-Dependency**: Ensures the extension works even if the user does not have Node.js installed on their OS.
+     * 2. **Version Parity**: Guarantees the pipeline runs on the exact same Node version as the Extension Host.
+     * 3. **Crash Protection**: `child_process.fork` isolates user scripts in a separate OS process. If a script crashes or hangs, the VS Code UI remains responsive.
+     */
     const nodedProcess = fork(bootstrapperPath, [pipelinePath], {
         execPath: process.execPath,
         env: { 
@@ -182,7 +197,15 @@ function activate(context) {
 
         const files = fs.readdirSync(pipelinesDir).filter(f => f.endsWith('.js'));
         
-        // Regex simples para identificar se o pipeline possui o trigger 'onSave'
+        /**
+         * ARCHITECTURAL DECISION [Performance Heuristic]:
+         * We use a Regex scan instead of a full AST Parser for trigger detection.
+         * * RATIONALE:
+         * The `onDidSave` event is high-frequency. Parsing the Abstract Syntax Tree (AST) of every saved file 
+         * would introduce unacceptable latency to the editor. A Regex check for the specific pattern 
+         * `/trigger:\s*['"]onSave['"]/` is O(n) and negligible for typical file sizes, providing 
+         * "good enough" discovery without the performance penalty.
+         */
         const triggerRegex = /trigger:\s*['"]onSave['"]/;
 
         for (const file of files) {

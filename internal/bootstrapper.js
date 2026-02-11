@@ -15,6 +15,14 @@ const eventPayload = process.env.BRIDGE_EVENT_PAYLOAD
 
 const uiListeners = new Set();
 
+/**
+ * ARCHITECTURAL DECISION [Ambient Context SDK]:
+ * We inject `global.bridge` manually at the bootstrap level instead of requiring users to import a module.
+ * * RATIONALE:
+ * 1. **Developer Experience**: Creates a "Magic SDK" feel (similar to the browser's `window` object), lowering the barrier to entry.
+ * 2. **Version Control**: Allows us to hot-swap or polyfill SDK methods without requiring users to update `package.json` dependencies.
+ * 3. **Scope Control**: We can strictly control what native modules (fs, path) are exposed or wrapped within the `bridge` object.
+ */
 global.bridge = {
     workspace: {
         root: workspaceRoot
@@ -32,9 +40,16 @@ global.bridge = {
 
         const scriptCode = fs.readFileSync(fullPath, 'utf8');
         
-        // --- CORREÇÃO TÉCNICA ---
-        // Envolvemos o código do usuário em uma IIFE Async.
-        // Isso transforma o 'return' do usuário no retorno desta função.
+        /**
+         * ARCHITECTURAL DECISION [Async IIFE Wrapper]:
+         * We wrap the raw user code in an Immediately Invoked Async Function Expression (IIFE).
+         * Format: `(async () => { ${userCode} })();`
+         * * RATIONALE:
+         * Node.js `vm.runInContext` treats code as a generic script body, which prohibits top-level `return` statements.
+         * By wrapping the code:
+         * 1. **Top-Level Return**: The user's `return` becomes the function's return value, allowing scripts to pass data back to the pipeline.
+         * 2. **Top-Level Await**: Enables modern async/await syntax usage at the root of the script without syntax errors.
+         */
         const wrappedCode = `(async () => {
             ${scriptCode}
         })();`;
@@ -92,6 +107,14 @@ try {
     const pipeline = require(userScriptPath);
     
     if (pipeline && typeof pipeline.run === 'function') {
+        /**
+         * ARCHITECTURAL DECISION [Graceful Failure Protocol]:
+         * We capture exceptions at the highest level to prevent "Silent Deaths" of the child process.
+         * * RATIONALE:
+         * If a user script throws an unhandled exception, standard Node.js behavior is to exit with code 1.
+         * We intercept this to send a structured `LOG` message back to the Extension Host via IPC,
+         * ensuring the user sees the error in the Output Channel/UI instead of just having the process disappear.
+         */
         pipeline.run().catch(err => {
             process.send({ type: 'LOG', data: `Erro no Pipeline: ${err.message}` });
             process.exit(1);
