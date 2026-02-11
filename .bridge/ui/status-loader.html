@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            color: var(--vscode-editor-foreground); 
+            font-family: var(--vscode-font-family); 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .loader-container {
+            text-align: center;
+        }
+        .spinner {
+            border: 4px solid var(--vscode-widget-shadow);
+            border-top: 4px solid var(--vscode-progressBar-background);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+        .message {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="loader-container">
+        <div class="spinner"></div>
+        <div class="message" id="msg">A carregar...</div>
+    </div>
+
+    <script>
+        window.addEventListener('message', event => {
+            const { type, payload } = event.data;
+            if (type === 'HYDRATE') {
+                document.getElementById('msg').innerText = payload.message || 'A processar...';
+            }
+        });
+    </script>
+</body>
+</html>

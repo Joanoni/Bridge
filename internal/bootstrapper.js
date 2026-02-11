@@ -1,6 +1,6 @@
 /**
  * Bootstrapper: O "DNA" injetado em cada script do usuário.
- * Versão Evoluída: Suporte a Webview (comunicação bi-direcional) e VM isolada.
+ * Correção: Envolve scripts atômicos em função assíncrona para permitir 'return'.
  */
 const path = require('path');
 const fs = require('fs');
@@ -8,17 +8,21 @@ const vm = require('vm');
 
 const userScriptPath = process.argv[2];
 const workspaceRoot = process.env.WORKSPACE_ROOT;
+// Captura payload de eventos se houver
+const eventPayload = process.env.BRIDGE_EVENT_PAYLOAD 
+    ? JSON.parse(process.env.BRIDGE_EVENT_PAYLOAD) 
+    : null;
 
-// Sistema simples de listeners para mensagens da UI
 const uiListeners = new Set();
 
-// 1. Definir o objeto Bridge que o usuário verá
 global.bridge = {
     workspace: {
         root: workspaceRoot
     },
     
-    // Implementação robusta usando o módulo VM
+    // Injeta o input inicial (útil para pipelines triggerados por evento)
+    input: eventPayload,
+
     execute: async (scriptRelativePath, payload) => {
         const fullPath = path.join(workspaceRoot, '.bridge', 'scripts', scriptRelativePath);
         
@@ -28,17 +32,22 @@ global.bridge = {
 
         const scriptCode = fs.readFileSync(fullPath, 'utf8');
         
-        // Criar o contexto isolado (Sandbox)
+        // --- CORREÇÃO TÉCNICA ---
+        // Envolvemos o código do usuário em uma IIFE Async.
+        // Isso transforma o 'return' do usuário no retorno desta função.
+        const wrappedCode = `(async () => {
+            ${scriptCode}
+        })();`;
+
         const sandbox = {
             bridge: {
                 input: payload,
                 state: global.bridge.state,
                 ui: global.bridge.ui,
-                // Permite chamadas recursivas conforme combinado
                 execute: global.bridge.execute 
             },
             console: console,
-            require: require, // Permite usar módulos do Node
+            require: require,
             __dirname: path.dirname(fullPath),
             process: process
         };
@@ -46,8 +55,8 @@ global.bridge = {
         const context = vm.createContext(sandbox);
         
         try {
-            // Executa o código dentro da VM
-            const script = new vm.Script(scriptCode);
+            const script = new vm.Script(wrappedCode);
+            // O resultado será o valor retornado pelo 'return' dentro do script do usuário
             return await script.runInContext(context);
         } catch (e) {
             console.error(`Erro na execução do script ${scriptRelativePath}:`, e);
@@ -56,37 +65,30 @@ global.bridge = {
     },
 
     ui: {
-        // Envia comando de renderização para o Host (VS Code)
         render: (component, payload) => {
             process.send({ type: 'UI_RENDER', component, payload });
         },
         
-        // Envia uma mensagem genérica para a Webview já aberta
         postMessage: (data) => {
             process.send({ type: 'UI_POST_MESSAGE', data });
         },
 
-        // Registra um callback para quando a Webview enviar algo de volta
         onMessage: (callback) => {
             uiListeners.add(callback);
             return () => uiListeners.delete(callback);
         }
     },
 
-    state: {} // Memória compartilhada persistente durante o tempo de vida do processo
+    state: {} 
 };
 
-// Ouvir mensagens vindas do processo pai (Extension Host)
 process.on('message', (message) => {
     if (message.type === 'UI_EVENT') {
-        // Notificar todos os listeners interessados em eventos da UI
         uiListeners.forEach(fn => fn(message.data));
     }
 });
 
-// 2. Carregar e executar o script de entrada (Pipeline)
 try {
-    // Usamos require para o script principal (Pipeline) pois ele pode usar exports
     const pipeline = require(userScriptPath);
     
     if (pipeline && typeof pipeline.run === 'function') {

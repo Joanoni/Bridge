@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            color: var(--vscode-editor-foreground); 
+            font-family: var(--vscode-font-family); 
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+        .notification-card {
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-focusBorder);
+            border-left: 4px solid var(--vscode-debugIcon-breakpointForeground);
+            padding: 12px;
+            width: 100%;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .title { font-weight: bold; margin-bottom: 5px; color: var(--vscode-textLink-foreground); }
+        .details { font-size: 0.9em; opacity: 0.8; }
+        .file-name { font-family: var(--vscode-editor-font-family); color: var(--vscode-symbolIcon-fileForeground); }
+    </style>
+</head>
+<body>
+    <div class="notification-card">
+        <div class="title" id="status-title">A aguardar...</div>
+        <div class="details">
+            Ficheiro: <span class="file-name" id="file-name">-</span><br>
+            Hora: <span id="save-time">-</span>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('message', event => {
+            const { type, payload } = event.data;
+            if (type === 'HYDRATE') {
+                document.getElementById('status-title').innerText = payload.title;
+                document.getElementById('file-name').innerText = payload.file;
+                document.getElementById('save-time').innerText = payload.timestamp;
+            }
+        });
+    </script>
+</body>
+</html>
