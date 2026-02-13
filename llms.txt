@@ -1,65 +1,60 @@
-# Bridge: Technical Context & Architecture for LLMs
+# Bridge LLM Partner Technical Specification
 
-> **System Role**: Bridge is a VS Code extension that acts as a local orchestration runtime, enabling users to build reactive tools using JavaScript and HTML without developing full extensions.
+## Project Vision & Mission
 
-# Vision & Core Philosophy
+Bridge is a message-driven orchestration runtime that enables developers to build stable, reactive, and integrated tools for VS Code using simple web technologies.
 
-Bridge operates on the **Conceptual Recoil** methodology: strictly prioritize native structures (Webviews, standard Node.js processes) over complex abstractions.
-- **Goal**: Zero-boilerplate extensibility.
-- **Principle**: If a feature requires a heavy build step or complex state management within the extension core, recoil and simplify. Delegate complexity to the user's script space.
-- **Identity**: Bridge is the "Host"; the User's `.bridge/` folder is the "Application".
+## Golden Rules of Architecture
 
-# Architecture & Lifecycle
+These rules are the foundational principles of the Bridge runtime. They are inviolable and guide all future development.
 
-The system uses a **Host-Client** model running entirely on the local machine.
+### Rule 1: Process Isolation (Host-App Boundary)
 
-## 1. The Host (VS Code Extension Process)
-- **Entry Point**: `extension.js`
-- **Runtime**: VS Code Extension Host.
-- **Responsibilities**:
-  - Manages `WebviewView` (Side Bar UI) and `WebviewPanel`.
-  - **Hydration Strategy**: Enforces a strict **150ms delay** after setting HTML content before sending the initial `HYDRATE` message. This ensures the Webview's `window.addEventListener` is ready to receive data.
-  - Event Listener: Watches `onDidSaveTextDocument` and executes commands.
-  - Process Manager: Spawns and kills `child_process` instances.
+The Bridge runtime operates on a strict Host-App process isolation model. The "Host" is the core VS Code extension process, and each "App" runs in its own dedicated, sandboxed child process.
 
-## 2. The Orchestrator (Pipeline Process)
-- **Entry Point**: `internal/bootstrapper.js`
-- **Runtime**: `child_process.fork()` using `process.execPath` (VS Code's internal Node.js binary).
-- **Isolation**: Each Pipeline trigger spawns a **new** OS process.
-- **Responsibilities**:
-  - Injects the `global.bridge` SDK.
-  - Executes the user's Pipeline logic.
-  - Manages atomic script execution via `vm.Context`.
-  - **State Persistence**: Maintains a `bridge.state` object that persists in memory for the entire duration of the Pipeline process. This object is passed by reference to every atomic script, enabling data sharing (e.g., caching file reads) between steps.
+-   **Architectural Anchor:** `src/host/processManager.js` uses `child_process.fork()` to spawn new Node.js processes for each App. This ensures that the App's execution context is completely separate from the Host's.
 
-## 3. The Worker (Atomic Script Runtime)
-- **Runtime**: Node.js `vm` module within the Orchestrator process.
-- **Wrapper**: Code is wrapped in an Async IIFE `(async () => { ... })()` to allow top-level `return` and `await`.
-- **Safety**: Prevents global scope pollution between scripts in the same pipeline.
+-   **Rationale (Stability & Integrity):** This separation is the primary stability feature of Bridge. An error, unhandled exception, or infinite loop within an App's code will only terminate its own sandboxed process. The Host, and therefore the user's VS Code window, remains completely responsive and unaffected. This design also provides dependency isolation; an App can use its own `node_modules` without conflicting with the Host's internal dependencies.
 
-# The .bridge/ Workspace Contract
+-   **Mechanism (`bootstrapper.js`):** `src/app/bootstrapper.js` serves as the universal entry point for every App process. Its sole responsibility is to establish a clean and predictable execution environment. It creates the `global.bridge` SDK object, abstracting away all IPC communication, and then loads the user's App code. This guarantees that every App starts with the same well-defined global scope, decoupled from the internal complexities of the Host.
 
-Bridge is an engine that discovers and consumes the `.bridge/` directory in the user's workspace root.
+### Rule 2: The Filesystem as the Message Bus
 
-- **`/.bridge/pipelines/*.js`** (Controllers)
-  - **Role**: Entry points for automation.
-  - **Execution**: `fork`ed as a separate process.
-  - **Contract**: Must export `config` (triggers) and `run()` (logic).
-- **`/.bridge/scripts/*.js`** (Workers)
-  - **Role**: Reusable, pure logic units.
-  - **Execution**: Run via `bridge.execute()` inside a `vm`.
-  - **Context**: Access to `bridge.input` (payload) and `bridge.state` (shared memory).
-- **`/.bridge/ui/*.html`** (Views)
-  - **Role**: Static UI components.
-  - **Rendering**: Served via Webview with local resource URI resolution.
-  - **Hydration**: Reacts to `window.postMessage` events (`HYDRATE`, `UI_EVENT`).
+All communication within the Bridge ecosystem is funneled through a central, physically-backed message bus implemented directly on the filesystem. The `messages/` directory is the single source of truth for all events.
 
-# Technical Golden Rules
+-   **Architectural Anchor:** `src/host/messageBus.js` contains the complete logic for this principle. The `postMessage` function translates event names (e.g., `user:deploy:new`) into directory paths (`messages/user/deploy/new/`) and the `initialize` function uses `vscode.workspace.createFileSystemWatcher` to listen for changes.
 
-1.  **The SDK is Injected**: Never `require('bridge')`. The `global.bridge` object is injected by `bootstrapper.js` at runtime.
-2.  **No Native NPM**: The extension core does NOT contain `npm`. Users must manage dependencies in `.bridge/` if their scripts require external modules.
-3.  **IPC Bridge**: UI interactions travel: `Webview -> Extension Host -> Pipeline Process`. Do not attempt direct communication between UI and Script.
-4.  **Process ExecPath**: Always use `process.execPath` for forking to ensure the runtime matches VS Code's internal Node.js version, avoiding dependency on the system's Node installation.
-5.  **Strict Trigger Regex**: File watchers scan for `/trigger:\s*['"]...['"]/` in pipeline files to avoid parsing ASTs on every save.
-6.  **Persistence Protocol**: `bridge.state` is the single source of truth for pipeline lifecycle data. It is not cleared between `bridge.execute()` calls within the same process.
-7.  **Async Hydration**: The Host must wait 150ms before sending the payload to the UI to avoid race conditions where the DOM is ready but the JS listener is not.
+-   **Rationale (Decoupling & Observability):** This architecture provides three critical benefits:
+    1.  **Total Decoupling:** The Host, Apps, and UIs do not need direct references to each other. They communicate by publishing and consuming messages from a known location. This allows for a highly resilient system where components can be started or stopped independently without breaking communication.
+    2.  **Persistence & Auditability:** Every event that flows through the system is persisted to disk. This creates an auditable trail of events, which is invaluable for debugging complex, asynchronous interactions. The automatic `history/` management provides a snapshot of past message states.
+    3.  **External Observability:** The state of the system can be observed by any tool that can read a filesystem. A developer can literally `cd` into the `messages/` directory to inspect the last known state of any event, or `tail` a directory for real-time monitoring, without needing any special Bridge-specific tooling.
+
+-   **Mechanism (`data.json` & `msg.signal`):** To ensure message integrity, a two-file system is used. The event payload is written completely to `data.json`. Only after this write operation is finished is the `msg.signal` file "touched" (its modification date is updated). Consumers (like the Host's watcher) only listen for changes to the `*.signal` file. This guarantees that a consumer will never read a partially written or incomplete `data.json` file, making the communication atomic and reliable.
+
+### Rule 3: Privileged Host Services via Async Messaging
+
+The Host acts as a privileged "kernel" that provides secure access to the VS Code API and the underlying system. Apps, running as unprivileged processes, request these services through an asynchronous messaging pattern, ensuring that all interactions with core functionalities are safe and controlled.
+
+-   **Architectural Anchor:** `src/host/services.js` implements the privileged logic (e.g., using `vscode.workspace.fs` or Node's `os` module), while SDK modules like `src/app/sdk/workspace.js` and `src/app/sdk/os.js` provide the user-facing abstractions.
+
+-   **Rationale (Security Boundary):** An App process is sandboxed and has no direct access to the `vscode` API. This is a critical security boundary. Rather than allowing Apps to use Node's `fs` to directly access the workspace (which is insecure and bypasses VS Code's virtual filesystem capabilities), they must request access through the Host. The Host acts as a gatekeeper, validating requests and using the official, safe VS Code APIs or trusted Node.js modules to fulfill them.
+
+-   **Communication Pattern (Request/Response):** The SDK abstracts this interaction into a clean, `async/await` function like `bridge.workspace.readFile()` or `bridge.os.getInfo()`. Internally, this function implements a Request/Response cycle over the public message bus:
+    1.  It generates a unique `requestId`.
+    2.  It publishes a request message (e.g., `bridge:workspace:readFileRequest`, `bridge:app:listRunningRequest`) containing the request details and the `requestId`.
+    3.  It subscribes to a response event (e.g., `bridge:workspace:readFileResponse`, `bridge:app:listRunningResponse`), waiting for a message with a matching `requestId`.
+    4.  The Host's service handler performs the action and publishes the response, which resolves the original promise in the App.
+
+-   **Data Bridge (Temporary File Pattern):** To handle large data payloads (like the content of a large file) without overwhelming the IPC channel, Bridge uses a temporary file bridge. Instead of sending the file content in the response message, the Host reads the file, writes its content to a temporary file in a secure, extension-managed storage location, and responds with the path to this temporary file. The App's SDK then reads the content directly from the disk and subsequently deletes the temporary file. This offloads the data transfer from the memory-constrained IPC channel to the highly optimized filesystem.
+
+## Domain Glossary (Ubiquitous Language)
+
+-   **Host:** The core of the extension, running within the main VS Code process. Orchestrated by `src/host/extension.js`, its primary responsibility is to act as a universal message router and privileged service provider, managing the complete lifecycle (starting, stopping, and tracking file renames) of all Apps and UI Surfaces without containing any user-specific business logic.
+
+-   **App:** User-provided code that runs in an isolated, sandboxed child process. Each App is launched via `src/app/bootstrapper.js` and exists as a client to the Host. It is unprivileged by design and communicates with the rest of the ecosystem exclusively by publishing and subscribing to Messages.
+
+-   **SDK (Software Development Kit):** The `global.bridge` object injected into every App's context. Assembled by `src/app/sdk/index.js`, its purpose is to provide a clean, high-level API for developers. It abstracts away the complexities of IPC, the filesystem message bus, and service requests. It is composed of several modules, such as `app` for inter-app lifecycle management (starting, stopping, and querying other apps), `ui` for controlling UI surfaces, and `workspace` for secure file access, allowing the developer to interact with the Bridge runtime through a clean, high-level API.
+
+-   **Message:** The fundamental unit of communication in Bridge. A Message consists of an `event` (a string identifier, e.g., `vscode:onSave`) and a `payload` (a JSON-serializable object). All components (Host, Apps, UIs) interact by publishing Messages to the central bus, which are then broadcast to all other components who can choose to listen and react to them.
+
+-   **UI Surface:** Any webview-based interface that an App can control. All surfaces are managed by the `src/host/uiManager.js` module. They come in two types: **static** surfaces, which are always available to any App (e.g., `sidebar`, `bottombar`), and **dynamic** surfaces (Webview Panels), which are created on-demand by a specific App.

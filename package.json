@@ -1,58 +1,79 @@
 {
-  "name": "bridge-vscode",
-  "displayName": "Bridge",
-  "description": "Orquestração de scripts e UI customizada ancorada no VS Code",
-  "version": "0.1.0",
-  "engines": {
-    "vscode": "^1.80.0"
-  },
-  "categories": [
-    "Other"
-  ],
-  "main": "./extension.js",
-  "activationEvents": [],
-  "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "bridge-explorer",
-          "title": "Bridge",
-          "icon": "$(plug)"
-        }
-      ]
+    "name": "bridge-vscode",
+    "displayName": "Bridge",
+    "description": "A message-driven orchestration runtime for VS Code.",
+    "version": "0.2.0",
+    "engines": {
+        "vscode": "^1.80.0"
     },
-    "views": {
-      "bridge-explorer": [
-        {
-          "type": "webview",
-          "id": "bridgeView",
-          "name": "Bridge Dashboard"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "bridge.runPipeline",
-        "title": "Bridge: Executar Pipeline",
-        "category": "Bridge"
-      },
-      {
-        "command": "bridge.openView",
-        "title": "Bridge: Abrir Painel Lateral",
-        "category": "Bridge"
-      }
+    "categories": [
+        "Other"
     ],
-    "keybindings": [
-      {
-        "command": "bridge.openView",
-        "key": "ctrl+alt+.",
-        "mac": "cmd+alt+.",
-        "when": "!terminalFocus"
-      }
-    ]
-  },
-  "devDependencies": {
-    "@types/vscode": "^1.80.0",
-    "eslint": "^8.41.0"
-  }
+    "main": "./src/host/extension.js",
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "bridge-container",
+                    "title": "Bridge",
+                    "icon": "$(plug)"
+                }
+            ],
+            "panel": [
+                {
+                    "id": "bridge-panel-container",
+                    "title": "Bridge Terminal",
+                    "icon": "$(terminal)"
+                }
+            ]
+        },
+        "views": {
+            "bridge-container": [
+                {
+                    "type": "webview",
+                    "id": "bridge.sidebar",
+                    "name": "Bridge"
+                }
+            ],
+            "bridge-panel-container": [
+                {
+                    "type": "webview",
+                    "id": "bridge.bottombar",
+                    "name": "Bridge Terminal"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "bridge.runApp",
+                "title": "Bridge: Run App",
+                "category": "Bridge"
+            },
+            {
+                "command": "bridge.focusSidebar",
+                "title": "Bridge: Focus Sidebar",
+                "category": "Bridge"
+            },
+            {
+                "command": "bridge.focusBottombar",
+                "title": "Bridge: Focus Bottom Bar",
+                "category": "Bridge"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "bridge.focusSidebar",
+                "key": "ctrl+alt+.",
+                "mac": "cmd+alt+.",
+                "when": "!terminalFocus"
+            }
+        ]
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.80.0",
+        "eslint": "^8.41.0"
+    }
 }
