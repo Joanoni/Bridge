@@ -58,3 +58,5 @@ The Host acts as a privileged "kernel" that provides secure access to the VS Cod
 -   **Message:** The fundamental unit of communication in Bridge. A Message consists of an `event` (a string identifier, e.g., `vscode:onSave`) and a `payload` (a JSON-serializable object). All components (Host, Apps, UIs) interact by publishing Messages to the central bus, which are then broadcast to all other components who can choose to listen and react to them.
 
 -   **UI Surface:** Any webview-based interface that an App can control. All surfaces are managed by the `src/host/uiManager.js` module. They come in two types: **static** surfaces, which are always available to any App (e.g., `sidebar`, `bottombar`), and **dynamic** surfaces (Webview Panels), which are created on-demand by a specific App.
+
+-   **Reasoning Document:** An artifact located in the docs/reasoning/ directory that serves as the historical log for the project's evolution. Each document summarizes a completed improvement cycle, detailing the objective, architectural decisions, and implementation summary. It is the persistent "memory" of the project, ensuring that the "why" behind each feature is preserved.

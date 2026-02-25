@@ -1,0 +1,3 @@
+Olá Helena, a fase de implementação foi concluída e o relatório de revisão final da Bruna foi aprovado. O ciclo desta melhoria está pronto para ser fechado.
+
+Por favor, execute o protocolo de consolidação, gere o documento de raciocínio e, ao final, me forneça um único comando `git` para adicionar todos os arquivos, fazer o commit com uma mensagem adequada descrevendo a melhoria implementada, e fazer o push.

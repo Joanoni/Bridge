@@ -1,0 +1,1 @@
+Proposta aprovada. Você está liberada para iniciar a implementação.
