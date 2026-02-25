@@ -1,6 +1,6 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const crypto = require('crypto');
-// @BLOCK:END(imports)
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(initializeOsApi)
 /**
@@ -27,7 +27,7 @@ function initializeOsApi(sdk, envConfig) {
                     reject(new Error('[Bridge SDK] getInfo request timed out.'));
                 }, timeoutDuration);
 
-                const unsubscribe = sdk.onMessage('bridge:os:getInfoResponse', (payload) => {
+                const unsubscribe = sdk.onMessage(sdk.events.os.getInfoResponse, (payload) => {
                     // @BLOCK:START(initializeOsApi:api-construction:getInfo-logic:on-response)
                     if (payload.requestId === requestId) {
                         clearTimeout(timeout);
@@ -44,7 +44,7 @@ function initializeOsApi(sdk, envConfig) {
                     // @BLOCK:END(initializeOsApi:api-construction:getInfo-logic:on-response)
                 });
 
-                sdk.postMessage('bridge:os:getInfoRequest', { requestId });
+                sdk.postMessage(sdk.events.os.getInfoRequest, { requestId });
             });
             // @BLOCK:END(initializeOsApi:api-construction:getInfo-logic)
         },

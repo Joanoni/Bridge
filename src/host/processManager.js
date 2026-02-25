@@ -1,9 +1,10 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { fork } = require('child_process');
-// @BLOCK:END(imports)
+const events = require('./eventContracts');
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(module-scope)
 /** @type {import('./configManager').get} */
@@ -42,7 +43,7 @@ function handleMessage(event, payload) {
     // @BLOCK:START(handleMessage:execution)
     const messageBus = require('./messageBus'); // Late require for responses
     switch (event) {
-        case 'bridge:app:start':
+        case events.app.start:
             // @BLOCK:START(handleMessage:execution:case-app-start)
             if (payload && payload.appName) {
                 startAppByName(payload.appName);
@@ -50,7 +51,7 @@ function handleMessage(event, payload) {
             // @BLOCK:END(handleMessage:execution:case-app-start)
             break;
 
-        case 'bridge:app:stop':
+        case events.app.stop:
             // @BLOCK:START(handleMessage:execution:case-app-stop)
             if (payload && payload.appName) {
                 stopAppByName(payload.appName);
@@ -58,16 +59,16 @@ function handleMessage(event, payload) {
             // @BLOCK:END(handleMessage:execution:case-app-stop)
             break;
         
-        case 'vscode:onRename':
+        case events.vscode.onRename:
             // @BLOCK:START(handleMessage:execution:case-vscode-rename)
             handleFileRename(payload.files);
             // @BLOCK:END(handleMessage:execution:case-vscode-rename)
             break;
 
-        case 'bridge:app:listRunningRequest':
+        case events.app.listRunningRequest:
             // @BLOCK:START(handleMessage:execution:case-list-running)
             if (payload && payload.requestId) {
-                messageBus.postMessage('bridge:app:listRunningResponse', {
+                messageBus.postMessage(events.app.listRunningResponse, {
                     requestId: payload.requestId,
                     runningApps: getRunningApps(),
                 });
@@ -142,6 +143,17 @@ function startAppByPath(appPath) {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc']
         });
         // @BLOCK:END(startAppByPath:execution:fork-process)
+
+        // @BLOCK:START(startAppByPath:execution:send-init-config)
+        // Send the event contracts to the new process immediately after forking.
+        // This is the "INIT" handshake that provides the App with its configuration.
+        appProcess.send({
+            type: 'INIT',
+            payload: {
+                events: events,
+            }
+        });
+        // @BLOCK:END(startAppByPath:execution:send-init-config)
 
         outputChannel.appendLine(`[Process Manager] Starting App: ${path.basename(appPath)} (PID: ${appProcess.pid})`);
 

@@ -1,8 +1,9 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
-// @BLOCK:END(imports)
+const events = require('./eventContracts');
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(module-scope)
 /** @type {import('./configManager').get} */
@@ -97,18 +98,18 @@ function handleMessage(event, payload) {
     const messageBus = require('./messageBus'); // Late require to avoid circular dependency
 
     switch (event) {
-        case 'bridge:ui:createPanelRequest':
+        case events.ui.createPanelRequest:
             // @BLOCK:START(handleMessage:execution:case-create-panel)
             try {
                 const panelId = createWebviewPanel(payload.options);
                 // Publish the successful response back to the bus with the original requestId.
-                messageBus.postMessage('bridge:ui:createPanelResponse', {
+                messageBus.postMessage(events.ui.createPanelResponse, {
                     requestId: payload.requestId,
                     panelId: panelId,
                 });
             } catch (error) {
                 // If creation fails, publish an error response.
-                messageBus.postMessage('bridge:ui:createPanelResponse', {
+                messageBus.postMessage(events.ui.createPanelResponse, {
                     requestId: payload.requestId,
                     error: error.message,
                 });
@@ -116,7 +117,7 @@ function handleMessage(event, payload) {
             // @BLOCK:END(handleMessage:execution:case-create-panel)
             break;
 
-        case 'bridge:ui:render':
+        case events.ui.render:
             // @BLOCK:START(handleMessage:execution:case-render)
             if (payload && payload.targetId && payload.componentPath) {
                 render(payload.targetId, payload.componentPath);

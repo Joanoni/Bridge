@@ -1,9 +1,10 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-// @BLOCK:END(imports)
+const events = require('./eventContracts');
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(module-scope)
 /** @type {import('./messageBus')} */
@@ -45,12 +46,12 @@ function initialize(bus, context, channel) {
 async function handleMessage(event, payload) {
     // @BLOCK:START(handleMessage:execution)
     switch (event) {
-        case 'bridge:workspace:readFileRequest':
+        case events.workspace.readFileRequest:
             // @BLOCK:START(handleMessage:execution:case-readFile)
             await handleReadFileRequest(payload);
             // @BLOCK:END(handleMessage:execution:case-readFile)
             break;
-        case 'bridge:os:getInfoRequest':
+        case events.os.getInfoRequest:
             // @BLOCK:START(handleMessage:execution:case-getInfo)
             await handleGetInfoRequest(payload);
             // @BLOCK:END(handleMessage:execution:case-getInfo)
@@ -84,7 +85,7 @@ async function handleReadFileRequest(payload) {
         fs.writeFileSync(tempFilePath, content);
 
         // Respond with the path to the temporary file.
-        messageBus.postMessage('bridge:workspace:readFileResponse', {
+        messageBus.postMessage(events.workspace.readFileResponse, {
             requestId,
             tempFilePath,
         });
@@ -92,7 +93,7 @@ async function handleReadFileRequest(payload) {
     } catch (error) {
         outputChannel.appendLine(`[Services] Error handling readFile request for ${filePath}: ${error.message}`);
         // Respond with an error message.
-        messageBus.postMessage('bridge:workspace:readFileResponse', {
+        messageBus.postMessage(events.workspace.readFileResponse, {
             requestId,
             error: `Failed to read file '${filePath}': ${error.message}`,
         });
@@ -116,7 +117,7 @@ async function handleGetInfoRequest(payload) {
         const hostname = os.hostname();
         const platform = os.platform();
 
-        messageBus.postMessage('bridge:os:getInfoResponse', {
+        messageBus.postMessage(events.os.getInfoResponse, {
             requestId,
             hostname,
             platform,
@@ -124,7 +125,7 @@ async function handleGetInfoRequest(payload) {
 
     } catch (error) {
         outputChannel.appendLine(`[Services] Error handling getInfo request: ${error.message}`);
-        messageBus.postMessage('bridge:os:getInfoResponse', {
+        messageBus.postMessage(events.os.getInfoResponse, {
             requestId,
             error: `Failed to get OS info: ${error.message}`,
         });

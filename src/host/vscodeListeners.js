@@ -1,7 +1,8 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const vscode = require('vscode');
 const path = require('path');
-// @BLOCK:END(imports)
+const events = require('./eventContracts');
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(module-scope)
 /** @type {import('./messageBus')} */
@@ -35,7 +36,7 @@ function initialize(bus, appConfig) {
             return;
         }
 
-        messageBus.postMessage('vscode:onSave', {
+        messageBus.postMessage(events.vscode.onSave, {
             fileName: path.basename(document.fileName),
             fullPath: document.fileName,
             languageId: document.languageId,
@@ -55,7 +56,7 @@ function initialize(bus, appConfig) {
         }));
 
         if (renamedFiles.length > 0) {
-            messageBus.postMessage('vscode:onRename', {
+            messageBus.postMessage(events.vscode.onRename, {
                 files: renamedFiles,
             });
         }

@@ -1,0 +1,16 @@
+{
+    "app": {
+        "path": "./app",
+        "onStart": null
+    },
+    "script": {
+        "path": "./script"
+    },
+    "ui": {
+        "path": "./ui"
+    },
+    "message": {
+        "path": "./message",
+        "maxHistory": 3
+    }
+}

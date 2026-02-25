@@ -1,6 +1,6 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const crypto = require('crypto');
-// @BLOCK:END(imports)
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(initializeAppApi)
 /**
@@ -23,7 +23,7 @@ function initializeAppApi(sdk, envConfig) {
                 console.error('[Bridge SDK] startApp requires a non-empty string for the appName.');
                 return;
             }
-            sdk.postMessage('bridge:app:start', { appName });
+            sdk.postMessage(sdk.events.app.start, { appName });
             // @BLOCK:END(initializeAppApi:api-construction:startApp-logic)
         },
 
@@ -37,7 +37,7 @@ function initializeAppApi(sdk, envConfig) {
                 console.error('[Bridge SDK] stopApp requires a non-empty string for the appName.');
                 return;
             }
-            sdk.postMessage('bridge:app:stop', { appName });
+            sdk.postMessage(sdk.events.app.stop, { appName });
             // @BLOCK:END(initializeAppApi:api-construction:stopApp-logic)
         },
 
@@ -56,7 +56,7 @@ function initializeAppApi(sdk, envConfig) {
                     reject(new Error('[Bridge SDK] getRunningApps request timed out.'));
                 }, timeoutDuration);
 
-                const unsubscribe = sdk.onMessage('bridge:app:listRunningResponse', (payload) => {
+                const unsubscribe = sdk.onMessage(sdk.events.app.listRunningResponse, (payload) => {
                     // @BLOCK:START(initializeAppApi:api-construction:getRunningApps-logic:on-response)
                     if (payload.requestId === requestId) {
                         clearTimeout(timeout);
@@ -70,7 +70,7 @@ function initializeAppApi(sdk, envConfig) {
                     // @BLOCK:END(initializeAppApi:api-construction:getRunningApps-logic:on-response)
                 });
 
-                sdk.postMessage('bridge:app:listRunningRequest', { requestId });
+                sdk.postMessage(sdk.events.app.listRunningRequest, { requestId });
             });
             // @BLOCK:END(initializeAppApi:api-construction:getRunningApps-logic)
         },

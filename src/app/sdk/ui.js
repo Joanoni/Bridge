@@ -1,6 +1,6 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const crypto = require('crypto');
-// @BLOCK:END(imports)
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(initializeUiApi)
 /* *
@@ -28,7 +28,7 @@ function initializeUiApi(sdk, envConfig) {
                 console.error('[Bridge SDK] ui.render requires a targetId and a componentPath.');
                 return;
             }
-            sdk.postMessage('bridge:ui:render', { targetId, componentPath });
+            sdk.postMessage(sdk.events.ui.render, { targetId, componentPath });
             // @BLOCK:END(initializeUiApi:api-construction:render-logic)
         },
 
@@ -49,7 +49,7 @@ function initializeUiApi(sdk, envConfig) {
                 }, timeoutDuration);
 
                 // Subscribe to the response event BEFORE sending the request.
-                const unsubscribe = sdk.onMessage('bridge:ui:createPanelResponse', (payload) => {
+                const unsubscribe = sdk.onMessage(sdk.events.ui.createPanelResponse, (payload) => {
                     if (payload.requestId === requestId) {
                         clearTimeout(timeout);
                         unsubscribe();
@@ -62,7 +62,7 @@ function initializeUiApi(sdk, envConfig) {
                 });
 
                 // Now, publish the request event to the main bus.
-                sdk.postMessage('bridge:ui:createPanelRequest', { requestId, options });
+                sdk.postMessage(sdk.events.ui.createPanelRequest, { requestId, options });
             });
             // @BLOCK:END(initializeUiApi:api-construction:createPanel-logic)
         },

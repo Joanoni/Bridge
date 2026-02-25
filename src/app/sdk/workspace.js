@@ -1,7 +1,7 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const crypto = require('crypto');
 const fs = require('fs');
-// @BLOCK:END(imports)
+// @BLOCK:END(Full Artifact)
 
 // @BLOCK:START(initializeWorkspaceApi)
 /**
@@ -33,7 +33,7 @@ function initializeWorkspaceApi(sdk, envConfig) {
                     reject(new Error(`[Bridge SDK] readFile request timed out for file: ${filePath}`));
                 }, timeoutDuration);
 
-                const unsubscribe = sdk.onMessage('bridge:workspace:readFileResponse', (payload) => {
+                const unsubscribe = sdk.onMessage(sdk.events.workspace.readFileResponse, (payload) => {
                     // @BLOCK:START(initializeWorkspaceApi:api-construction:readFile-logic:on-response)
                     if (payload.requestId === requestId) {
                         clearTimeout(timeout);
@@ -58,7 +58,7 @@ function initializeWorkspaceApi(sdk, envConfig) {
                     // @BLOCK:END(initializeWorkspaceApi:api-construction:readFile-logic:on-response)
                 });
 
-                sdk.postMessage('bridge:workspace:readFileRequest', { requestId, filePath });
+                sdk.postMessage(sdk.events.workspace.readFileRequest, { requestId, filePath });
             });
             // @BLOCK:END(initializeWorkspaceApi:api-construction:readFile-logic)
         },

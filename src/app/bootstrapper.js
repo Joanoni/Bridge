@@ -1,20 +1,16 @@
-// @BLOCK:START(imports)
+// @BLOCK:START(Full Artifact)
 const path = require('path');
 const buildAppSdk = require('./sdk');
-// @BLOCK:END(imports)
+// @BLOCK:END(Full Artifact)
 
-// @BLOCK:START(bootstrapper)
-/* *
- * ARCHITECTURAL NOTE [Process Boundary]:
- * This script is the first piece of code to run inside the sandboxed child_process.
- * It is completely isolated from the VS Code Extension Host. Its only link is the
- * standard Node.js IPC channel (process.send, process.on('message')).
- * Its primary responsibility is to set up a clean, consistent execution environment
- * for the user's App code.
+// @BLOCK:START(start)
+/**
+ * The main application logic, executed only after receiving configuration from the Host.
+ * @param {object} appConfig The configuration payload from the Host, including event contracts.
  */
-(function main() {
+function start(appConfig) {
     try {
-        // @BLOCK:START(bootstrapper:setup)
+        // @BLOCK:START(start:setup)
         // 1. Retrieve the App's entry file path from the command line arguments.
         const appScriptPath = process.argv[2];
         if (!appScriptPath) {
@@ -30,32 +26,55 @@ const buildAppSdk = require('./sdk');
             uiPath: process.env.UI_PATH,
             messagePath: process.env.MESSAGE_PATH,
         };
-        // @BLOCK:END(bootstrapper:setup)
+        // @BLOCK:END(start:setup)
 
-        // @BLOCK:START(bootstrapper:sdk-injection)
-        // 3. Build and inject the global SDK.
-        // The `buildAppSdk` function assembles all the necessary modules and APIs.
-        global.bridge = buildAppSdk(envConfig);
-        // @BLOCK:END(bootstrapper:sdk-injection)
+        // @BLOCK:START(start:sdk-injection)
+        // 3. Build and inject the global SDK, now including the event contracts.
+        global.bridge = buildAppSdk(envConfig, appConfig);
+        // @BLOCK:END(start:sdk-injection)
         
-        // @BLOCK:START(bootstrapper:app-load)
+        // @BLOCK:START(start:app-load)
         // 4. Load and execute the user's App code.
-        // We `require` it, which allows the user to use standard Node.js module patterns.
         const appModule = require(appScriptPath);
 
         // Apps are not required to export anything, but their code will run.
-        // If they export functions like `onStart` or `onMessage`, the SDK will handle them.
         console.log(`[Bridge App] Successfully loaded ${path.basename(appScriptPath)}.`);
-        // @BLOCK:END(bootstrapper:app-load)
+        // @BLOCK:END(start:app-load)
 
     } catch (err) {
-        // @BLOCK:START(bootstrapper:error-handling)
+        // @BLOCK:START(start:error-handling)
         // If anything fails during bootstrapping, log it to stderr so the Host can see it,
         // and exit with a non-zero code to signal failure.
         console.error(`[Bridge Bootstrapper] Critical error: ${err.message}\n${err.stack}`);
         process.exit(1);
-        // @BLOCK:END(bootstrapper:error-handling)
+        // @BLOCK:END(start:error-handling)
     }
+}
+// @BLOCK:END(start)
 
+// @BLOCK:START(bootstrap)
+/* *
+ * ARCHITECTURAL NOTE [Process Boundary & Handshake]:
+ * This script is the first piece of code to run inside the sandboxed child_process.
+ * It does not execute the App immediately. Instead, it waits for an 'INIT' message
+ * from the Host process. This message contains essential runtime configuration,
+ * such as the event contracts, which are necessary to build the SDK.
+ * This handshake ensures the App is fully configured before any user code runs.
+ */
+(function bootstrap() {
+    const BOOTSTRAP_TIMEOUT = 5000; // 5 seconds
+
+    const timeout = setTimeout(() => {
+        console.error('[Bridge Bootstrapper] Critical error: Did not receive INIT message from Host within timeout.');
+        process.exit(1);
+    }, BOOTSTRAP_TIMEOUT);
+
+    process.once('message', (message) => {
+        if (message && message.type === 'INIT') {
+            clearTimeout(timeout);
+            // Configuration received. Now we can start the main application logic.
+            start(message.payload);
+        }
+    });
 })();
-// @BLOCK:END(bootstrapper)
+// @BLOCK:END(bootstrap)

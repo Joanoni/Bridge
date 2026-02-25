@@ -35,31 +35,38 @@
                 {
                     "type": "webview",
                     "id": "bridge.sidebar",
-                    "name": "Bridge"
+                    "name": "Bridge",
+                    "when": "bridge.workspaceInitialized"
                 }
             ],
             "bridge-panel-container": [
                 {
                     "type": "webview",
                     "id": "bridge.bottombar",
-                    "name": "Bridge Terminal"
+                    "name": "Bridge Terminal",
+                    "when": "bridge.workspaceInitialized"
                 }
             ]
         },
         "commands": [
             {
+                "command": "bridge.initializeWorkspace",
+                "title": "Initialize Workspace",
+                "category": "Bridge"
+            },
+            {
                 "command": "bridge.runApp",
-                "title": "Bridge: Run App",
+                "title": "Run App",
                 "category": "Bridge"
             },
             {
                 "command": "bridge.focusSidebar",
-                "title": "Bridge: Focus Sidebar",
+                "title": "Focus Sidebar",
                 "category": "Bridge"
             },
             {
                 "command": "bridge.focusBottombar",
-                "title": "Bridge: Focus Bottom Bar",
+                "title": "Focus Bottom Bar",
                 "category": "Bridge"
             }
         ],
@@ -68,7 +75,7 @@
                 "command": "bridge.focusSidebar",
                 "key": "ctrl+alt+.",
                 "mac": "cmd+alt+.",
-                "when": "!terminalFocus"
+                "when": "!terminalFocus && bridge.workspaceInitialized"
             }
         ]
     },
