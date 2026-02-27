@@ -2,7 +2,7 @@
     "name": "bridge-vscode",
     "displayName": "Bridge",
     "description": "A message-driven orchestration runtime for VS Code.",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "engines": {
         "vscode": "^1.80.0"
     },
@@ -53,29 +53,6 @@
                 "command": "bridge.initializeWorkspace",
                 "title": "Initialize Workspace",
                 "category": "Bridge"
-            },
-            {
-                "command": "bridge.runApp",
-                "title": "Run App",
-                "category": "Bridge"
-            },
-            {
-                "command": "bridge.focusSidebar",
-                "title": "Focus Sidebar",
-                "category": "Bridge"
-            },
-            {
-                "command": "bridge.focusBottombar",
-                "title": "Focus Bottom Bar",
-                "category": "Bridge"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "bridge.focusSidebar",
-                "key": "ctrl+alt+.",
-                "mac": "cmd+alt+.",
-                "when": "!terminalFocus && bridge.workspaceInitialized"
             }
         ]
     },
