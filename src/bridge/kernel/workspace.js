@@ -59,6 +59,5 @@ async function initializeWorkspace(context) {
 }
 
 module.exports = {
-    getWorkspaceRoot,
     initializeWorkspace,
 };

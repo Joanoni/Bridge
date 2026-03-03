@@ -1,9 +1,7 @@
-// @BLOCK:START(Full Artifact)
+
 const vscode = require('vscode');
 const bootstrapper = require('./bridge/bootstrapper');
-
 let outputChannel;
-
 /* *
  * Main activation function for the Bridge extension.
  * This function now acts as a minimal bootloader, delegating all logic
@@ -13,7 +11,6 @@ let outputChannel;
 async function activate(context) {
     outputChannel = vscode.window.createOutputChannel("Bridge");
     outputChannel.appendLine("[Bridge] Activating extension...");
-
     try {
         await bootstrapper.initialize(context, outputChannel);
         outputChannel.appendLine("[Bridge] Platform initialized successfully.");
@@ -23,7 +20,6 @@ async function activate(context) {
         vscode.window.showErrorMessage(`Bridge failed to activate: ${error.message}`);
     }
 }
-
 /* *
  * Deactivation function. Delegates cleanup to the bootstrapper.
  */
@@ -36,9 +32,7 @@ function deactivate() {
         outputChannel.dispose();
     }
 }
-
 module.exports = {
     activate,
     deactivate,
 };
-// @BLOCK:END(Full Artifact)

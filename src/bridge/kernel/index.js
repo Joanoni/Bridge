@@ -55,6 +55,7 @@ function generateTypeDefinitions(workspaceRoot, components) {
     state.outputChannel?.appendLine(`[Kernel] Type definitions generated at '.bridge/contracts.d.ts'.`);
 }
 
+
 /**
  * Initializes the Bridge component platform.
  * @param {vscode.ExtensionContext} context

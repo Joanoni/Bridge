@@ -52,7 +52,7 @@ These components provide the fundamental primitives required for inter-component
 
 These components use the foundational primitives to implement the core features of the Bridge runtime.
 
-### 3. Component: `CommandRegistrar`
+### 3. Component: `RegisterCommand`
 -   **Purpose**: Registers and handles user-facing commands in the VS Code UI.
 -   **Manifest (`bridge.json`)**:
     ```json
@@ -100,7 +100,7 @@ These components use the foundational primitives to implement the core features 
     }
     ```
 -   **Responsibilities**:
-    -   Use the `event-bus` to listen for events from the `CommandRegistrar` (e.g., `command:run-app:triggered`).
+    -   Use the `event-bus` to listen for events from the `RegisterCommand` (e.g., `command:run-app:triggered`).
     -   Use `child_process.fork()` to spawn the `bootstrapper.js`.
     -   Use the `communication-bus` API to get connection details and pass them to the new process via a one-time IPC handshake.
 
