@@ -1,15 +1,15 @@
 {
     "name": "bridge-vscode",
     "displayName": "Bridge",
-    "description": "A message-driven orchestration runtime for VS Code.",
-    "version": "0.2.0",
+    "description": "A component-based orchestration platform for VS Code.",
+    "version": "0.4.0",
     "engines": {
         "vscode": "^1.80.0"
     },
     "categories": [
         "Other"
     ],
-    "main": "./src/host/extension.js",
+    "main": "./src/extension.js",
     "activationEvents": [
         "onCommand:bridge.initializeWorkspace",
         "workspaceContains:**/.bridge/config.json"
@@ -36,45 +36,24 @@
                 {
                     "type": "webview",
                     "id": "bridge.sidebar",
-                    "name": "Bridge"
+                    "name": "Bridge",
+                    "when": "bridge.workspaceInitialized"
                 }
             ],
             "bridge-panel-container": [
                 {
                     "type": "webview",
                     "id": "bridge.bottombar",
-                    "name": "Bridge Terminal"
+                    "name": "Bridge Terminal",
+                    "when": "bridge.workspaceInitialized"
                 }
             ]
         },
         "commands": [
             {
                 "command": "bridge.initializeWorkspace",
-                "title": "Bridge: Initialize Workspace",
+                "title": "Initialize Workspace",
                 "category": "Bridge"
-            },
-            {
-                "command": "bridge.runApp",
-                "title": "Bridge: Run App",
-                "category": "Bridge"
-            },
-            {
-                "command": "bridge.focusSidebar",
-                "title": "Bridge: Focus Sidebar",
-                "category": "Bridge"
-            },
-            {
-                "command": "bridge.focusBottombar",
-                "title": "Bridge: Focus Bottom Bar",
-                "category": "Bridge"
-            }
-        ],
-        "keybindings": [
-            {
-                "command": "bridge.focusSidebar",
-                "key": "ctrl+alt+.",
-                "mac": "cmd+alt+.",
-                "when": "!terminalFocus"
             }
         ]
     },

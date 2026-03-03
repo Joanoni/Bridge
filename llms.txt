@@ -2,59 +2,48 @@
 
 ## Project Vision & Mission
 
-Bridge is a message-driven orchestration runtime that enables developers to build stable, reactive, and integrated tools for VS Code using simple web technologies.
+Bridge is an agnostic, component-based platform for VS Code. Its mission is to provide a robust and predictable foundation for developers to create, share, and compose powerful, deeply-integrated editor tooling.
 
 ## Golden Rules of Architecture
 
-These rules are the foundational principles of the Bridge runtime. They are inviolable and guide all future development.
+These rules are the foundational principles of the Bridge platform. They are inviolable and guide all future development.
 
-### Rule 1: Process Isolation (Host-App Boundary)
+### Rule 1: The Primacy of the Component
 
-The Bridge runtime operates on a strict Host-App process isolation model. The "Host" is the core VS Code extension process, and each "App" runs in its own dedicated, sandboxed child process.
+The Bridge platform operates on a strict component model. All functionality, from low-level infrastructure to user-facing features, is implemented as a modular, independent Component. The platform's core, the Kernel, is a minimal engine whose sole purpose is to discover, validate, and orchestrate these Components.
 
--   **Architectural Anchor:** `src/host/processManager.js` uses `child_process.fork()` to spawn new Node.js processes for each App. This ensures that the App's execution context is completely separate from the Host's.
+-   **Architectural Anchor:** `src/bridge/bootstrapper.js` and `src/bridge/resolver.js`, which together form the Kernel.
 
--   **Rationale (Stability & Integrity):** This separation is the primary stability feature of Bridge. An error, unhandled exception, or infinite loop within an App's code will only terminate its own sandboxed process. The Host, and therefore the user's VS Code window, remains completely responsive and unaffected. This design also provides dependency isolation; an App can use its own `node_modules` without conflicting with the Host's internal dependencies.
+-   **Rationale (Extensibility & Modularity):** This principle ensures maximum extensibility and modularity. By treating all functionality as replaceable parts, the platform remains agnostic and un-opinionated, allowing users and the community to tailor, replace, or extend any aspect of its behavior.
 
--   **Mechanism (`bootstrapper.js`):** `src/app/bootstrapper.js` serves as the universal entry point for every App process. Its sole responsibility is to establish a clean and predictable execution environment. It creates the `global.bridge` SDK object, abstracting away all IPC communication, and then loads the user's App code. This guarantees that every App starts with the same well-defined global scope, decoupled from the internal complexities of the Host.
+### Rule 2: Explicit Contracts and Dependencies
 
-### Rule 2: The Filesystem as the Message Bus
+All interaction and collaboration between Components is governed by explicit contracts declared in a `bridge.json` manifest file. Each Component must declare a unique contract it `provides` and a list of contracts it `dependsOn`. Collaboration is achieved through direct API injection, not through implicit or broadcast-based mechanisms.
 
-All communication within the Bridge ecosystem is funneled through a central, physically-backed message bus implemented directly on the filesystem. The `messages/` directory is the single source of truth for all events.
+-   **Architectural Anchor:** The `bridge.json` file specification and the graph-building logic in `src/bridge/resolver.js`.
 
--   **Architectural Anchor:** `src/host/messageBus.js` contains the complete logic for this principle. The `postMessage` function translates event names (e.g., `user:deploy:new`) into directory paths (`messages/user/deploy/new/`) and the `initialize` function uses `vscode.workspace.createFileSystemWatcher` to listen for changes.
+-   **Rationale (Predictability & Clarity):** This rule guarantees a predictable and self-documenting architecture. By making dependencies explicit, the system can be validated for integrity before execution, eliminating a whole class of runtime errors and making the relationship between components transparent and understandable.
 
--   **Rationale (Decoupling & Observability):** This architecture provides three critical benefits:
-    1.  **Total Decoupling:** The Host, Apps, and UIs do not need direct references to each other. They communicate by publishing and consuming messages from a known location. This allows for a highly resilient system where components can be started or stopped independently without breaking communication.
-    2.  **Persistence & Auditability:** Every event that flows through the system is persisted to disk. This creates an auditable trail of events, which is invaluable for debugging complex, asynchronous interactions. The automatic `history/` management provides a snapshot of past message states.
-    3.  **External Observability:** The state of the system can be observed by any tool that can read a filesystem. A developer can literally `cd` into the `messages/` directory to inspect the last known state of any event, or `tail` a directory for real-time monitoring, without needing any special Bridge-specific tooling.
+### Rule 3: The "Fail-Fast" Bootloader as the Guardian of Stability
 
--   **Mechanism (`data.json` & `msg.signal`):** To ensure message integrity, a two-file system is used. The event payload is written completely to `data.json`. Only after this write operation is finished is the `msg.signal` file "touched" (its modification date is updated). Consumers (like the Host's watcher) only listen for changes to the `*.signal` file. This guarantees that a consumer will never read a partially written or incomplete `data.json` file, making the communication atomic and reliable.
+The stability of the platform is guaranteed by an aggressively robust bootloader that validates the entire component ecosystem *before* executing any component's code. The bootloader MUST fail the initialization process with a clear and immediate error if it detects any architectural inconsistencies.
 
-### Rule 3: Privileged Host Services via Async Messaging
+-   **Architectural Anchor:** The validation steps within `src/bridge/resolver.js` and `src/bridge/bootstrapper.js`.
 
-The Host acts as a privileged "kernel" that provides secure access to the VS Code API and the underlying system. Apps, running as unprivileged processes, request these services through an asynchronous messaging pattern, ensuring that all interactions with core functionalities are safe and controlled.
-
--   **Architectural Anchor:** `src/host/services.js` implements the privileged logic (e.g., using `vscode.workspace.fs` or Node's `os` module), while SDK modules like `src/app/sdk/workspace.js` and `src/app/sdk/os.js` provide the user-facing abstractions.
-
--   **Rationale (Security Boundary):** An App process is sandboxed and has no direct access to the `vscode` API. This is a critical security boundary. Rather than allowing Apps to use Node's `fs` to directly access the workspace (which is insecure and bypasses VS Code's virtual filesystem capabilities), they must request access through the Host. The Host acts as a gatekeeper, validating requests and using the official, safe VS Code APIs or trusted Node.js modules to fulfill them.
-
--   **Communication Pattern (Request/Response):** The SDK abstracts this interaction into a clean, `async/await` function like `bridge.workspace.readFile()` or `bridge.os.getInfo()`. Internally, this function implements a Request/Response cycle over the public message bus:
-    1.  It generates a unique `requestId`.
-    2.  It publishes a request message (e.g., `bridge:workspace:readFileRequest`, `bridge:app:listRunningRequest`) containing the request details and the `requestId`.
-    3.  It subscribes to a response event (e.g., `bridge:workspace:readFileResponse`, `bridge:app:listRunningResponse`), waiting for a message with a matching `requestId`.
-    4.  The Host's service handler performs the action and publishes the response, which resolves the original promise in the App.
-
--   **Data Bridge (Temporary File Pattern):** To handle large data payloads (like the content of a large file) without overwhelming the IPC channel, Bridge uses a temporary file bridge. Instead of sending the file content in the response message, the Host reads the file, writes its content to a temporary file in a secure, extension-managed storage location, and responds with the path to this temporary file. The App's SDK then reads the content directly from the disk and subsequently deletes the temporary file. This offloads the data transfer from the memory-constrained IPC channel to the highly optimized filesystem.
+-   **Rationale (Robustness & Debuggability):** This "Fail-Fast" principle moves error detection from runtime to startup time, ensuring the platform never runs in an invalid, ambiguous, or unpredictable state. It validates for four critical failure conditions:
+    1.  **Contract Collisions:** Prevents ambiguity by ensuring no two components provide the same contract.
+    2.  **Missing Dependencies:** Ensures the component ecosystem is complete.
+    3.  **Circular Dependencies:** Prevents impossible initialization loops.
+    4.  **Interface Violations:** Guarantees that a component's returned API adheres to its declared contract shape.
 
 ## Domain Glossary (Ubiquitous Language)
 
--   **Host:** The core of the extension, running within the main VS Code process. Orchestrated by `src/host/extension.js`, its primary responsibility is to act as a universal message router and privileged service provider, managing the complete lifecycle (starting, stopping, and tracking file renames) of all Apps and UI Surfaces without containing any user-specific business logic.
+-   **Kernel (formerly Host):** The core of the extension, orchestrated by `src/bridge/bootstrapper.js`. It is a minimal, agnostic engine responsible for the complete lifecycle of Components: discovering them, validating their inter-dependencies, initializing them in a safe order, and injecting their required APIs. It contains no user-facing business logic.
 
--   **App:** User-provided code that runs in an isolated, sandboxed child process. Each App is launched via `src/app/bootstrapper.js` and exists as a client to the Host. It is unprivileged by design and communicates with the rest of the ecosystem exclusively by publishing and subscribing to Messages.
+-   **Component:** The fundamental, universal unit of functionality in Bridge. A Component is a self-contained module (a directory) that includes a `bridge.json` manifest and the code that implements a specific feature. All functionality in the Bridge ecosystem is provided by Components.
 
--   **SDK (Software Development Kit):** The `global.bridge` object injected into every App's context. Assembled by `src/app/sdk/index.js`, its purpose is to provide a clean, high-level API for developers. It abstracts away the complexities of IPC, the filesystem message bus, and service requests. It is composed of several modules, such as `app` for inter-app lifecycle management (starting, stopping, and querying other apps), `ui` for controlling UI surfaces, and `workspace` for secure file access, allowing the developer to interact with the Bridge runtime through a clean, high-level API.
+-   **Manifest (`bridge.json`):** The contract file at the root of every Component's directory. It is the single source of truth for a Component's identity, defining what contract it `provides`, which contracts it `dependsOn`, and the shape of its public `interface`. It is the primary input for the Kernel's dependency resolver.
 
--   **Message:** The fundamental unit of communication in Bridge. A Message consists of an `event` (a string identifier, e.g., `vscode:onSave`) and a `payload` (a JSON-serializable object). All components (Host, Apps, UIs) interact by publishing Messages to the central bus, which are then broadcast to all other components who can choose to listen and react to them.
+-   **Contract (`provides`/`dependsOn`):** A unique string identifier (e.g., 'logger', 'acme:file-watcher') declared in a Component's manifest. Contracts are the "sockets" and "plugs" of the architecture. The Kernel uses these identifiers to wire Components together, ensuring that a Component requiring a specific functionality (`dependsOn`) is connected to another Component that explicitly offers it (`provides`).
 
--   **UI Surface:** Any webview-based interface that an App can control. All surfaces are managed by the `src/host/uiManager.js` module. They come in two types: **static** surfaces, which are always available to any App (e.g., `sidebar`, `bottombar`), and **dynamic** surfaces (Webview Panels), which are created on-demand by a specific App.
+-   **Reasoning Document:** An artifact located in the `docs/reasoning/` directory that serves as the historical log for the project's evolution. Each document summarizes a completed improvement cycle, detailing the objective, architectural decisions, and implementation summary. It is the persistent "memory" of the project, ensuring that the "why" behind each feature is preserved.
