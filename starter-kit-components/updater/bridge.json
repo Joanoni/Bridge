@@ -1,0 +1,17 @@
+{
+    "name": "Updater",
+    "version": "1.0.0",
+    "description": "Manages updates for Bridge starter components.",
+    "main": "index.js",
+    "provides": "core:updater",
+    "dependsOn": [],
+    "interface": {
+    },
+    "commands": [
+        {
+            "command": "bridge.reviewUpdates",
+            "title": "Review Starter Component Updates",
+            "category": "Bridge"
+        }
+    ]
+}

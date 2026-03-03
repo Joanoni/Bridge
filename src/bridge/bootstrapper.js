@@ -1,4 +1,3 @@
-
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
@@ -99,11 +98,18 @@ async function initialize(context, outputChannel) {
             const module = require(mainPath);
             const deps = {};
             for (const depContract of (manifest.dependsOn || [])) {
-                // This is a simplified injection. A real one would be nested.
-                // For now, we map contract to api directly.
                 deps[depContract] = apiRegistry.get(depContract);
             }
-            const api = await module.initialize(deps);
+
+            const bridgeContext = {
+                extensionPath: state.context.extensionPath,
+                extensionVersion: state.context.extension.packageJSON.version,
+                globalState: state.context.globalState,
+                workspaceState: state.context.workspaceState,
+                subscriptions: state.context.subscriptions,
+            };
+            
+            const api = await module.initialize(deps, bridgeContext);
             
             // Validate the returned API against the manifest's interface.
             validateInterface(api, manifest.interface);
